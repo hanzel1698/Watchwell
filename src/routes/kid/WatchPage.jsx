@@ -6,6 +6,8 @@ import { getCachedFeed } from '../../services/feedCache'
 import { logWatch } from '../../services/watchHistoryService'
 import { isDailyLimitReached } from '../../services/timeLimitService'
 import { formatRelativeTime } from '../../lib/format'
+import Avatar from '../../components/shared/Avatar'
+import { BackIcon } from '../../components/kid/icons'
 
 const LIMIT_CHECK_INTERVAL_MS = 15_000
 
@@ -27,6 +29,9 @@ export default function WatchPage() {
   const lastTickRef = useRef(null)
 
   const [video] = useState(() => findWhitelistedVideo(videoId))
+  const [upNext] = useState(() =>
+    getCachedFeed().videos.filter((v) => v.videoId !== videoId).slice(0, 4),
+  )
 
   useEffect(() => {
     if (!video) return
@@ -88,9 +93,9 @@ export default function WatchPage() {
 
   if (!video) {
     return (
-      <div className="p-8 text-center text-white">
-        <p className="text-lg font-medium">This video isn't available.</p>
-        <Link to="/" className="mt-4 inline-block text-blue-400 hover:underline">
+      <div className="p-10 text-center">
+        <p className="text-lg font-medium text-text">This video isn't available.</p>
+        <Link to="/" className="mt-4 inline-block text-brand hover:underline">
           Back to home
         </Link>
       </div>
@@ -98,15 +103,51 @@ export default function WatchPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-4">
-      <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
+    <div className="mx-auto max-w-4xl p-7">
+      <button
+        onClick={() => navigate(-1)}
+        aria-label="Back"
+        className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white"
+      >
+        <BackIcon className="h-6 w-6" />
+      </button>
+
+      <div className="aspect-video w-full overflow-hidden rounded-[20px] bg-[#1c1917]">
         <div ref={playerRef} className="h-full w-full" />
       </div>
-      <h1 className="mt-4 text-xl font-semibold text-white">{video.title}</h1>
-      <p className="mt-1 text-neutral-400">
-        {video.channelTitle}
-        {video.publishedAt ? ` • ${formatRelativeTime(video.publishedAt)}` : ''}
-      </p>
+
+      <h1 className="mt-5 font-heading text-2xl font-bold text-text">{video.title}</h1>
+      <div className="mt-3 flex items-center gap-3">
+        <Avatar label={video.channelTitle} />
+        <p className="text-base text-text-muted">
+          {video.channelTitle}
+          {video.publishedAt ? ` · ${formatRelativeTime(video.publishedAt)}` : ''}
+        </p>
+      </div>
+
+      {upNext.length > 0 ? (
+        <>
+          <div className="my-7 h-px bg-border" />
+          <h2 className="mb-4 font-heading text-xl font-bold text-text">Up next</h2>
+          <div className="flex flex-wrap gap-5">
+            {upNext.map((v) => (
+              <Link key={v.videoId} to={`/watch/${v.videoId}`} className="w-[220px]">
+                <div className="aspect-video overflow-hidden rounded-[14px] bg-bg-alt">
+                  <img
+                    src={v.thumbnailUrl}
+                    alt={v.title}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+                <p className="mt-2 line-clamp-2 text-[15px] font-semibold leading-tight text-text">
+                  {v.title}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

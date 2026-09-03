@@ -12,13 +12,18 @@ uploads) comes from the [YouTube Data API v3](https://developers.google.com/yout
 
 ## Status
 
-This is an early scaffold: routing, the kid-facing feed/search/player, and
-the admin dashboard (whitelist management, watch history, daily time limit)
-are wired up and working against **local data** (`localStorage`) instead of
-a real database. Supabase integration is intentionally not wired in yet —
-it's waiting on a schema migration script. See `src/services/*.js` — each
-file is commented `TEMPORARY` where it'll be swapped to real Supabase calls
-without changing its exported function signatures.
+Routing, the kid-facing feed/search/watch/history pages, and the admin
+dashboard (whitelist management, watch history, daily time limit) are wired
+up and working against **local data** (`localStorage`) instead of a real
+database. Supabase integration is intentionally not wired in yet — it's
+waiting on a schema migration script. See `src/services/*.js` — each file is
+commented `TEMPORARY` where it'll be swapped to real Supabase calls without
+changing its exported function signatures.
+
+Visual design follows the approved mockup: warm cream background, red brand
+accent, Baloo 2 (headings) + Inter (body) fonts, a PIN-keypad admin gate, and
+a dark sidebar admin dashboard. See `src/index.css` (`@theme` block) for the
+full design token list.
 
 ## Setup
 
@@ -40,7 +45,8 @@ Fill in `.env.local`:
 |---|---|
 | `VITE_YOUTUBE_API_KEY` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) — enable "YouTube Data API v3", create an API key. Consider restricting it (HTTP referrer or IP) since it ships in the client bundle. |
 | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | Your Supabase project settings → API. Not yet used by the app (see Status above). |
-| `VITE_ADMIN_PIN` | Any PIN/passphrase you want, e.g. `1234`. |
+| `VITE_ADMIN_PIN` | A 4-digit PIN, e.g. `2468` — the on-screen keypad is built for exactly 4 digits. |
+| `VITE_KID_NAME` | Optional — kid's first name, shown in the home feed greeting and avatar. |
 
 `.env.local` is gitignored and never committed.
 
@@ -85,13 +91,14 @@ npm run preview   # sanity-check the production build locally
 
 ```
 src/
-  routes/kid/       Home feed, watch page, search, "time's up" screen
-  routes/admin/      PIN login, dashboard
-  components/kid/    Video card/grid, time-limit gate
-  components/admin/  Whitelist forms/list, history table, time limit settings
-  components/shared/ Header (logo + search bar)
-  services/          Data access — whitelist, watch history, time limits,
-                      feed cache (all localStorage for now), YouTube API
-  context/           Admin auth (PIN) context
-  lib/                Config/env, format helpers, YouTube IFrame API loader
+  routes/kid/         Home feed, watch page, search, history, "time's up" screen
+  routes/admin/        PIN login, dashboard/channels/videos/history/settings
+  components/kid/      Video card/grid, side/bottom nav, shell, time-limit gate
+  components/admin/    Whitelist forms, dashboard shell (sidebar/top menu)
+  components/shared/   Header, Logo, Avatar (shared brand components)
+  services/            Data access — whitelist, watch history, time limits,
+                        feed cache (all localStorage for now), YouTube API
+  context/             Admin auth (PIN) context
+  lib/                 Config/env, format helpers, YouTube IFrame API loader,
+                        avatar pastel-color helper
 ```

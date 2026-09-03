@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import Logo from './Logo'
+import Avatar from './Avatar'
+import { getKidName } from '../../lib/config'
+import { SearchIcon } from '../kid/icons'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -11,35 +15,32 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-neutral-800 bg-[#0f0f0f] px-4 py-2">
-      <Link to="/" className="flex items-center gap-1 shrink-0">
-        <span className="text-xl font-bold tracking-tight text-white">WatchWell</span>
+    <header className="flex h-20 shrink-0 items-center gap-4 border-b border-border bg-surface px-6">
+      <Link to="/" className="flex shrink-0 items-center gap-2.5">
+        <Logo size="md" />
+        <span className="font-heading text-lg font-bold text-text">WatchWell</span>
       </Link>
 
-      <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-xl">
+      <form onSubmit={handleSubmit} className="flex w-full max-w-[520px] items-center">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           type="search"
-          placeholder="Search"
-          className="w-full rounded-l-full border border-neutral-700 bg-[#121212] px-4 py-1.5 text-white placeholder-neutral-500 focus:border-blue-500 focus:outline-none"
+          placeholder="Search for videos..."
+          className="h-12 w-full rounded-full bg-bg-alt px-5 text-[15px] text-text placeholder-text-muted outline-none"
         />
-        <button
-          type="submit"
-          aria-label="Search"
-          className="rounded-r-full border border-l-0 border-neutral-700 bg-[#222222] px-5 text-white hover:bg-neutral-700"
-        >
-          🔍
+        <button type="submit" aria-label="Search" className="sr-only">
+          <SearchIcon className="h-5 w-5" />
         </button>
       </form>
 
       <Link
         to="/admin"
         aria-label="Admin"
-        className="shrink-0 text-neutral-500 hover:text-neutral-300"
-        title="Admin"
+        className="ml-auto shrink-0"
+        title="Parent access"
       >
-        ⚙️
+        <Avatar label={getKidName()} />
       </Link>
     </header>
   )

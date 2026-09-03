@@ -36,36 +36,35 @@ export default function AddChannelForm({ onAdded }) {
   }
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-[#181818] p-4">
-      <h3 className="mb-3 font-semibold text-white">Add a channel</h3>
-      <form onSubmit={handleLookup} className="flex gap-2">
+    <div className="mb-5">
+      <form onSubmit={handleLookup} className="flex gap-2.5">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Channel URL, @handle, or ID"
-          className="flex-1 rounded-lg border border-neutral-700 bg-[#0f0f0f] px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+          placeholder="Paste channel URL or ID"
+          className="h-11 flex-1 rounded-[10px] border border-border bg-surface px-4 text-sm text-text outline-none focus:border-brand"
         />
         <button
           type="submit"
           disabled={status === 'loading'}
-          className="rounded-lg bg-neutral-700 px-4 py-2 text-white hover:bg-neutral-600 disabled:opacity-50"
+          className="h-11 shrink-0 rounded-[10px] bg-brand px-5 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {status === 'loading' ? 'Looking up…' : 'Look up'}
+          {status === 'loading' ? 'Looking up…' : 'Add Channel'}
         </button>
       </form>
 
-      {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
+      {error ? <p className="mt-2 text-sm font-medium text-brand">{error}</p> : null}
 
       {preview ? (
-        <div className="mt-3 flex items-center gap-3 rounded-lg bg-[#0f0f0f] p-3">
+        <div className="mt-3 flex items-center gap-3 rounded-[12px] border border-border bg-surface p-3">
           <img src={preview.thumbnailUrl} alt="" className="h-12 w-12 rounded-full" />
           <div className="flex-1">
-            <p className="font-medium text-white">{preview.title}</p>
-            <p className="text-sm text-neutral-400">{preview.channelId}</p>
+            <p className="font-semibold text-text">{preview.title}</p>
+            <p className="text-sm text-text-muted">{preview.channelId}</p>
           </div>
           <button
             onClick={handleConfirm}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500"
+            className="rounded-[10px] bg-brand px-3.5 py-2 text-sm font-semibold text-white"
           >
             Confirm & whitelist
           </button>

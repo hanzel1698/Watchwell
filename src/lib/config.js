@@ -27,3 +27,9 @@ export function getYoutubeApiKey() {
 export function getAdminPin() {
   return required('VITE_ADMIN_PIN')
 }
+
+// Cosmetic only (used in the home feed greeting and avatar initial) — not
+// required, since the app should still work before this is configured.
+export function getKidName() {
+  return import.meta.env.VITE_KID_NAME || 'there'
+}
