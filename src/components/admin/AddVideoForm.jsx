@@ -24,9 +24,9 @@ export default function AddVideoForm({ onAdded }) {
     }
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     try {
-      addWhitelistedVideo(preview)
+      await addWhitelistedVideo(preview)
       setPreview(null)
       setInput('')
       onAdded()

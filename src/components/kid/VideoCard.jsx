@@ -19,13 +19,13 @@ export default function VideoCard({ video, showDate = true }) {
         ) : null}
       </div>
       <div className="mt-3 flex gap-3">
-        <Avatar label={video.channelTitle} />
+        <Avatar label={video.channelTitle ?? video.title} />
         <div className="min-w-0">
           <p className="line-clamp-2 text-[17px] font-bold leading-tight text-text">
             {video.title}
           </p>
           <p className="mt-1 text-sm text-text-muted">
-            {video.channelTitle}
+            {video.channelTitle ?? 'Added by a parent'}
             {showDate && video.publishedAt ? ` · ${formatRelativeTime(video.publishedAt)}` : ''}
           </p>
         </div>

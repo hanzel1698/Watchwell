@@ -1,53 +1,74 @@
-// Caches whitelisted channels' latest uploads so the kid-facing feed never
-// calls the YouTube API directly (quota-safe). Refreshed explicitly — on
-// admin dashboard load, or by calling refreshFeedCache() from a scheduled
-// job — never on every kid page view.
-//
-// TEMPORARY: backed by localStorage until Supabase is wired up (see
-// whitelistService.js).
+// Refreshes the kid feed's "cache" — which is just watchwell_videos itself.
+// For each whitelisted channel, pulls its latest uploads from YouTube and
+// upserts them into watchwell_videos (channel_id set). Meant to be called
+// sparingly (admin dashboard visit / a scheduled job), never on kid page
+// loads — kid pages just read watchwell_videos directly via
+// whitelistService.getAllApprovedVideos(), which never touches the
+// YouTube API.
 
-import { readStore, writeStore } from '../lib/localStore'
-import { getWhitelistedChannels, getWhitelistedVideos } from './whitelistService'
-import { getChannelUploads } from './youtubeApi'
+import { getSupabaseClient } from '../lib/supabaseClient'
+import { getWhitelistedChannels } from './whitelistService'
+import { getChannelUploads, getVideoDurations, uploadsPlaylistIdFor } from './youtubeApi'
 
-const CACHE_KEY = 'feedCache'
 const STALE_AFTER_MS = 4 * 60 * 60 * 1000 // 4 hours
+// No dedicated "last refreshed" column in the schema, so it's tracked as a
+// synthetic row in watchwell_settings alongside the time limit.
+const REFRESH_SETTING_KEY = 'feed_last_refreshed_at'
 
-export function getCachedFeed() {
-  return readStore(CACHE_KEY, { videos: [], refreshedAt: null })
+export async function getFeedRefreshedAt() {
+  const { data, error } = await getSupabaseClient()
+    .from('watchwell_settings')
+    .select('value')
+    .eq('key', REFRESH_SETTING_KEY)
+    .maybeSingle()
+  if (error) throw error
+  return data?.value ?? null
 }
 
-export function isFeedStale() {
-  const { refreshedAt } = getCachedFeed()
+export async function isFeedStale() {
+  const refreshedAt = await getFeedRefreshedAt()
   if (!refreshedAt) return true
   return Date.now() - new Date(refreshedAt).getTime() > STALE_AFTER_MS
 }
 
-// Pulls latest uploads for every whitelisted channel, merges in individually
-// whitelisted videos, de-dupes, sorts newest first, and caches the result.
 export async function refreshFeedCache() {
-  const channels = getWhitelistedChannels()
-  const individualVideos = getWhitelistedVideos()
+  const supabase = getSupabaseClient()
+  const channels = await getWhitelistedChannels()
 
-  const uploadsByChannel = await Promise.all(
-    channels
-      .filter((c) => c.uploadsPlaylistId)
-      .map((c) => getChannelUploads(c.uploadsPlaylistId).catch(() => [])),
-  )
+  for (const channel of channels) {
+    const uploadsPlaylistId = uploadsPlaylistIdFor(channel.channelId)
+    if (!uploadsPlaylistId) continue
 
-  const byVideoId = new Map()
-  for (const video of individualVideos) byVideoId.set(video.videoId, video)
-  for (const uploads of uploadsByChannel) {
-    for (const video of uploads) {
-      if (!byVideoId.has(video.videoId)) byVideoId.set(video.videoId, video)
+    let uploads
+    try {
+      uploads = await getChannelUploads(uploadsPlaylistId)
+    } catch {
+      continue // one channel failing (deleted/private) shouldn't abort the whole refresh
     }
+    if (uploads.length === 0) continue
+
+    const durations = await getVideoDurations(uploads.map((v) => v.videoId)).catch(() => ({}))
+
+    const rows = uploads.map((v) => ({
+      youtube_video_id: v.videoId,
+      title: v.title,
+      thumbnail_url: v.thumbnailUrl,
+      duration_seconds: durations[v.videoId] ?? null,
+      published_at: v.publishedAt,
+      channel_id: channel.dbId,
+    }))
+
+    const { error } = await supabase
+      .from('watchwell_videos')
+      .upsert(rows, { onConflict: 'youtube_video_id' })
+    if (error) throw error
   }
 
-  const videos = [...byVideoId.values()].sort(
-    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  )
+  const refreshedAt = new Date().toISOString()
+  const { error } = await supabase
+    .from('watchwell_settings')
+    .upsert({ key: REFRESH_SETTING_KEY, value: refreshedAt }, { onConflict: 'key' })
+  if (error) throw error
 
-  const cache = { videos, refreshedAt: new Date().toISOString() }
-  writeStore(CACHE_KEY, cache)
-  return cache
+  return { refreshedAt }
 }

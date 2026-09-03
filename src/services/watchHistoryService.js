@@ -1,22 +1,34 @@
-// TEMPORARY: backed by localStorage until Supabase is wired up (see
-// whitelistService.js). Admin-visible, never editable by the kid UI.
+// Backed by Supabase (watchwell_watch_history). Admin-visible, never
+// editable by the kid UI. Note: the schema doesn't store a channel name on
+// history rows, only the video's own title.
 
-import { readStore, writeStore } from '../lib/localStore'
+import { getSupabaseClient } from '../lib/supabaseClient'
 
-const HISTORY_KEY = 'watchHistory'
-
-export function getWatchHistory() {
-  return readStore(HISTORY_KEY, [])
+function mapRow(row) {
+  return {
+    videoId: row.youtube_video_id,
+    title: row.title,
+    watchedAt: row.watched_at,
+    durationWatchedSeconds: row.duration_seconds,
+  }
 }
 
-// entry: { videoId, title, channelTitle, watchedAt, durationWatchedSeconds }
-export function logWatch(entry) {
-  const history = getWatchHistory()
-  const next = [{ ...entry, watchedAt: entry.watchedAt ?? new Date().toISOString() }, ...history]
-  writeStore(HISTORY_KEY, next)
-  return next
+export async function getWatchHistory() {
+  const { data, error } = await getSupabaseClient()
+    .from('watchwell_watch_history')
+    .select('*')
+    .order('watched_at', { ascending: false })
+    .limit(500)
+  if (error) throw error
+  return data.map(mapRow)
 }
 
-export function getHistoryForDate(dateString) {
-  return getWatchHistory().filter((entry) => entry.watchedAt.startsWith(dateString))
+// entry: { videoId, title, durationWatchedSeconds }
+export async function logWatch(entry) {
+  const { error } = await getSupabaseClient().from('watchwell_watch_history').insert({
+    youtube_video_id: entry.videoId,
+    title: entry.title,
+    duration_seconds: entry.durationWatchedSeconds,
+  })
+  if (error) throw error
 }

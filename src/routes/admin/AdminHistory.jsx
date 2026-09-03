@@ -1,9 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getWatchHistory } from '../../services/watchHistoryService'
+import { getAllApprovedVideos } from '../../services/whitelistService'
 import { formatDuration } from '../../lib/format'
 
 export default function AdminHistory() {
-  const [history] = useState(getWatchHistory)
+  const [history, setHistory] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    // watchwell_watch_history doesn't store a channel name, so it's looked
+    // up from the video catalog (falls back to blank if the video was
+    // since removed from the whitelist).
+    Promise.all([getWatchHistory(), getAllApprovedVideos()])
+      .then(([rows, catalog]) => {
+        const channelById = new Map(catalog.map((v) => [v.videoId, v.channelTitle]))
+        setHistory(
+          rows.map((entry) => ({ ...entry, channelTitle: channelById.get(entry.videoId) ?? '—' })),
+        )
+      })
+      .catch((err) => setError(err.message))
+  }, [])
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -13,7 +29,11 @@ export default function AdminHistory() {
         <div>Date</div>
         <div>Watched</div>
       </div>
-      {history.length === 0 ? (
+      {error ? (
+        <p className="p-5 text-sm text-brand">{error}</p>
+      ) : history === null ? (
+        <p className="p-5 text-sm text-text-faint">Loading…</p>
+      ) : history.length === 0 ? (
         <p className="p-5 text-sm text-text-faint">No videos watched yet.</p>
       ) : (
         history.map((entry, i) => (

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getDailyLimitMinutes, setDailyLimitMinutes } from '../../services/timeLimitService'
 
 const STEP = 5
@@ -6,13 +6,23 @@ const MIN = 15
 const MAX = 180
 
 export default function AdminSettings() {
-  const [minutes, setMinutes] = useState(getDailyLimitMinutes)
+  const [minutes, setMinutes] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    getDailyLimitMinutes()
+      .then(setMinutes)
+      .catch((err) => setError(err.message))
+  }, [])
 
   function update(next) {
     const clamped = Math.min(MAX, Math.max(MIN, next))
     setMinutes(clamped)
-    setDailyLimitMinutes(clamped)
+    setDailyLimitMinutes(clamped).catch((err) => setError(err.message))
   }
+
+  if (error) return <p className="text-brand">{error}</p>
+  if (minutes === null) return <p className="text-text-faint">Loading…</p>
 
   return (
     <div className="max-w-[420px]">

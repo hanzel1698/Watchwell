@@ -171,3 +171,24 @@ export function parseIso8601Duration(duration) {
   const [, hours, minutes, seconds] = match
   return (Number(hours) || 0) * 3600 + (Number(minutes) || 0) * 60 + (Number(seconds) || 0)
 }
+
+// The DB doesn't persist a channel's uploads playlist ID (not in the
+// schema), but YouTube channel IDs and their uploads-playlist IDs follow a
+// fixed convention — swap the "UC" prefix for "UU" — so it's cheaply
+// re-derivable instead of needing an extra API call per refresh.
+export function uploadsPlaylistIdFor(channelId) {
+  return channelId?.startsWith('UC') ? `UU${channelId.slice(2)}` : null
+}
+
+// Batch-fetches durations for a set of video IDs (used when caching a
+// channel's uploads — playlistItems doesn't include duration, so this is
+// one extra call per channel refresh rather than one per video).
+export async function getVideoDurations(videoIds) {
+  if (videoIds.length === 0) return {}
+  const data = await apiGet('videos', { part: 'contentDetails', id: videoIds.join(',') })
+  const durations = {}
+  for (const item of data.items ?? []) {
+    durations[item.id] = parseIso8601Duration(item.contentDetails.duration)
+  }
+  return durations
+}

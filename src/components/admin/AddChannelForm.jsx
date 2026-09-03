@@ -24,9 +24,9 @@ export default function AddChannelForm({ onAdded }) {
     }
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     try {
-      addWhitelistedChannel(preview)
+      await addWhitelistedChannel(preview)
       setPreview(null)
       setInput('')
       onAdded()

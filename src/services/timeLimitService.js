@@ -1,11 +1,11 @@
-// TEMPORARY: backed by localStorage until Supabase is wired up (see
-// whitelistService.js). Cumulative watch time resets automatically at local
-// midnight because it's keyed by today's local date string.
+// Backed by Supabase (watchwell_settings, key 'daily_time_limit_minutes' —
+// seeded to 60 by the migration). Cumulative watch time resets automatically
+// at local midnight because "today" is computed from the local date string.
 
-import { readStore, writeStore } from '../lib/localStore'
-import { getHistoryForDate } from './watchHistoryService'
+import { getSupabaseClient } from '../lib/supabaseClient'
+import { getWatchHistory } from './watchHistoryService'
 
-const LIMIT_KEY = 'dailyLimitMinutes'
+const LIMIT_SETTING_KEY = 'daily_time_limit_minutes'
 const DEFAULT_LIMIT_MINUTES = 60
 
 function todayLocalDateString() {
@@ -14,26 +14,39 @@ function todayLocalDateString() {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10)
 }
 
-export function getDailyLimitMinutes() {
-  return readStore(LIMIT_KEY, DEFAULT_LIMIT_MINUTES)
+export async function getDailyLimitMinutes() {
+  const { data, error } = await getSupabaseClient()
+    .from('watchwell_settings')
+    .select('value')
+    .eq('key', LIMIT_SETTING_KEY)
+    .maybeSingle()
+  if (error) throw error
+  return data ? Number(data.value) : DEFAULT_LIMIT_MINUTES
 }
 
-export function setDailyLimitMinutes(minutes) {
-  writeStore(LIMIT_KEY, minutes)
+export async function setDailyLimitMinutes(minutes) {
+  const { error } = await getSupabaseClient()
+    .from('watchwell_settings')
+    .upsert({ key: LIMIT_SETTING_KEY, value: String(minutes) }, { onConflict: 'key' })
+  if (error) throw error
 }
 
-export function getWatchedSecondsToday() {
-  return getHistoryForDate(todayLocalDateString()).reduce(
-    (total, entry) => total + (entry.durationWatchedSeconds || 0),
-    0,
-  )
+export async function getWatchedSecondsToday() {
+  const today = todayLocalDateString()
+  const history = await getWatchHistory()
+  return history
+    .filter((entry) => entry.watchedAt.startsWith(today))
+    .reduce((total, entry) => total + (entry.durationWatchedSeconds || 0), 0)
 }
 
-export function getRemainingSecondsToday() {
-  const limitSeconds = getDailyLimitMinutes() * 60
-  return Math.max(0, limitSeconds - getWatchedSecondsToday())
+export async function getRemainingSecondsToday() {
+  const [limitMinutes, watchedSeconds] = await Promise.all([
+    getDailyLimitMinutes(),
+    getWatchedSecondsToday(),
+  ])
+  return Math.max(0, limitMinutes * 60 - watchedSeconds)
 }
 
-export function isDailyLimitReached() {
-  return getRemainingSecondsToday() <= 0
+export async function isDailyLimitReached() {
+  return (await getRemainingSecondsToday()) <= 0
 }

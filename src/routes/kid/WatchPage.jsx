@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { loadYouTubeIframeApi } from '../../lib/youtubeIframeApi'
-import { getWhitelistedVideos } from '../../services/whitelistService'
-import { getCachedFeed } from '../../services/feedCache'
+import { getAllApprovedVideos } from '../../services/whitelistService'
 import { logWatch } from '../../services/watchHistoryService'
 import { isDailyLimitReached } from '../../services/timeLimitService'
 import { formatRelativeTime } from '../../lib/format'
@@ -10,15 +9,6 @@ import Avatar from '../../components/shared/Avatar'
 import { BackIcon } from '../../components/kid/icons'
 
 const LIMIT_CHECK_INTERVAL_MS = 15_000
-
-// Finds a video's metadata among whitelisted content only. A video that
-// isn't whitelisted (e.g. someone edits the URL by hand) simply isn't found
-// here, so WatchPage refuses to play it.
-function findWhitelistedVideo(videoId) {
-  const individual = getWhitelistedVideos().find((v) => v.videoId === videoId)
-  if (individual) return individual
-  return getCachedFeed().videos.find((v) => v.videoId === videoId) ?? null
-}
 
 export default function WatchPage() {
   const { videoId } = useParams()
@@ -28,13 +18,37 @@ export default function WatchPage() {
   const watchedSecondsRef = useRef(0)
   const lastTickRef = useRef(null)
 
-  const [video] = useState(() => findWhitelistedVideo(videoId))
-  const [upNext] = useState(() =>
-    getCachedFeed().videos.filter((v) => v.videoId !== videoId).slice(0, 4),
-  )
+  // 'loading' | 'ready' | 'not-found'
+  const [status, setStatus] = useState('loading')
+  const [video, setVideo] = useState(null)
+  const [upNext, setUpNext] = useState([])
+
+  // Loads the whitelist catalog and finds this video in it — a video that
+  // isn't in the (whitelist-only) catalog simply isn't found, so this page
+  // refuses to play it.
+  useEffect(() => {
+    let cancelled = false
+    setStatus('loading')
+    getAllApprovedVideos()
+      .then((catalog) => {
+        if (cancelled) return
+        const found = catalog.find((v) => v.videoId === videoId)
+        if (!found) {
+          setStatus('not-found')
+          return
+        }
+        setVideo(found)
+        setUpNext(catalog.filter((v) => v.videoId !== videoId).slice(0, 4))
+        setStatus('ready')
+      })
+      .catch(() => setStatus('not-found'))
+    return () => {
+      cancelled = true
+    }
+  }, [videoId])
 
   useEffect(() => {
-    if (!video) return
+    if (status !== 'ready' || !video) return
 
     let intervalId
     let disposed = false
@@ -42,13 +56,12 @@ export default function WatchPage() {
     function persistWatchedSeconds() {
       const seconds = Math.round(watchedSecondsRef.current)
       if (seconds <= 0) return
+      watchedSecondsRef.current = 0
       logWatch({
         videoId: video.videoId,
         title: video.title,
-        channelTitle: video.channelTitle,
         durationWatchedSeconds: seconds,
-      })
-      watchedSecondsRef.current = 0
+      }).catch((err) => console.error('Failed to log watch history:', err))
     }
 
     loadYouTubeIframeApi().then((YT) => {
@@ -58,23 +71,20 @@ export default function WatchPage() {
         playerVars: { rel: 0, modestbranding: 1 },
         events: {
           onStateChange: (event) => {
-            if (event.data === YT.PlayerState.PLAYING) {
-              lastTickRef.current = Date.now()
-            } else {
-              lastTickRef.current = null
-            }
+            lastTickRef.current = event.data === YT.PlayerState.PLAYING ? Date.now() : null
           },
         },
       })
 
-      intervalId = setInterval(() => {
+      intervalId = setInterval(async () => {
         if (lastTickRef.current) {
           watchedSecondsRef.current += (Date.now() - lastTickRef.current) / 1000
           lastTickRef.current = Date.now()
         }
         if (watchedSecondsRef.current >= 30) persistWatchedSeconds()
 
-        if (isDailyLimitReached()) {
+        const reached = await isDailyLimitReached().catch(() => false)
+        if (reached) {
           persistWatchedSeconds()
           playerInstanceRef.current?.pauseVideo?.()
           navigate('/time-up', { replace: true })
@@ -88,10 +98,11 @@ export default function WatchPage() {
       persistWatchedSeconds()
       playerInstanceRef.current?.destroy?.()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [video])
+  }, [status, video, navigate])
 
-  if (!video) {
+  if (status === 'loading') return null
+
+  if (status === 'not-found') {
     return (
       <div className="p-10 text-center">
         <p className="text-lg font-medium text-text">This video isn't available.</p>
@@ -118,9 +129,9 @@ export default function WatchPage() {
 
       <h1 className="mt-5 font-heading text-2xl font-bold text-text">{video.title}</h1>
       <div className="mt-3 flex items-center gap-3">
-        <Avatar label={video.channelTitle} />
+        <Avatar label={video.channelTitle ?? video.title} />
         <p className="text-base text-text-muted">
-          {video.channelTitle}
+          {video.channelTitle ?? 'Added by a parent'}
           {video.publishedAt ? ` · ${formatRelativeTime(video.publishedAt)}` : ''}
         </p>
       </div>

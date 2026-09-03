@@ -1,15 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import VideoGrid from '../../components/kid/VideoGrid'
-import { getCachedFeed } from '../../services/feedCache'
+import { getAllApprovedVideos } from '../../services/whitelistService'
 import { SearchIcon } from '../../components/kid/icons'
 
-// Filters the cached whitelist client-side only — never calls YouTube's
+// Filters the whitelist catalog client-side only — never calls YouTube's
 // public search endpoint, which would surface non-whitelisted content.
 export default function SearchResults() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [input, setInput] = useState(searchParams.get('q') ?? '')
+  const [catalog, setCatalog] = useState(null)
   const query = input.trim().toLowerCase()
+
+  useEffect(() => {
+    getAllApprovedVideos()
+      .then(setCatalog)
+      .catch(() => setCatalog([]))
+  }, [])
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -17,14 +24,13 @@ export default function SearchResults() {
   }
 
   const results = useMemo(() => {
-    if (!query) return []
-    const { videos } = getCachedFeed()
-    return videos.filter(
+    if (!query || !catalog) return []
+    return catalog.filter(
       (video) =>
         video.title.toLowerCase().includes(query) ||
-        video.channelTitle.toLowerCase().includes(query),
+        (video.channelTitle ?? '').toLowerCase().includes(query),
     )
-  }, [query])
+  }, [query, catalog])
 
   return (
     <div className="p-7">
@@ -50,6 +56,8 @@ export default function SearchResults() {
         <p className="py-16 text-center text-lg text-text-faint">
           Type something to find a video!
         </p>
+      ) : catalog === null ? (
+        <p className="py-16 text-center text-lg text-text-faint">Loading…</p>
       ) : results.length === 0 ? (
         <div className="py-14 text-center">
           <div className="relative mx-auto mb-6 h-[100px] w-[100px] rounded-full bg-brand-tint">

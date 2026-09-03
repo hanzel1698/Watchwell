@@ -8,22 +8,26 @@ profile (no login).
 Playback always streams live from YouTube via the official
 [IFrame Player API](https://developers.google.com/youtube/iframe_api_reference) —
 nothing is downloaded or re-hosted. Metadata (titles, thumbnails, latest
-uploads) comes from the [YouTube Data API v3](https://developers.google.com/youtube/v3).
+uploads) comes from the [YouTube Data API v3](https://developers.google.com/youtube/v3),
+and all app data (whitelist, watch history, settings) lives in Supabase.
 
 ## Status
 
 Routing, the kid-facing feed/search/watch/history pages, and the admin
 dashboard (whitelist management, watch history, daily time limit) are wired
-up and working against **local data** (`localStorage`) instead of a real
-database. Supabase integration is intentionally not wired in yet — it's
-waiting on a schema migration script. See `src/services/*.js` — each file is
-commented `TEMPORARY` where it'll be swapped to real Supabase calls without
-changing its exported function signatures.
+up against a real Supabase backend — see `supabase/migrations/0001_watchwell_schema.sql`
+for the schema and `src/services/*.js` for the data-access layer.
 
 Visual design follows the approved mockup: warm cream background, red brand
 accent, Baloo 2 (headings) + Inter (body) fonts, a PIN-keypad admin gate, and
 a dark sidebar admin dashboard. See `src/index.css` (`@theme` block) for the
 full design token list.
+
+**Known schema limitation:** `watchwell_videos` only has a channel name via
+its (nullable) FK to `watchwell_channels`. A video the admin whitelists
+individually (not via a whole channel) has `channel_id = null`, so it has no
+persisted channel name — the UI falls back to "Added by a parent" for those
+cards rather than making an extra YouTube API call per video.
 
 ## Setup
 
@@ -33,7 +37,17 @@ full design token list.
 npm install
 ```
 
-### 2. Add your API keys
+### 2. Run the Supabase migration
+
+In your Supabase project's SQL editor, run
+`supabase/migrations/0001_watchwell_schema.sql`. It creates four
+`watchwell_`-prefixed tables (channels, videos, watch history, settings)
+without touching anything else in your project, and enables RLS with a
+permissive "allow all" policy — reasonable for a single-user personal app
+using the anon key, called out explicitly here in case you add real
+multi-user auth later and want to tighten it.
+
+### 3. Add your API keys
 
 ```bash
 cp .env.example .env.local
@@ -44,7 +58,8 @@ Fill in `.env.local`:
 | Variable | Where to get it |
 |---|---|
 | `VITE_YOUTUBE_API_KEY` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) — enable "YouTube Data API v3", create an API key. Consider restricting it (HTTP referrer or IP) since it ships in the client bundle. |
-| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | Your Supabase project settings → API. Not yet used by the app (see Status above). |
+| `VITE_SUPABASE_URL` | Your Supabase project settings → API → Project URL. |
+| `VITE_SUPABASE_ANON_KEY` | Your Supabase project settings → API → anon/public key. Safe to ship client-side — it's only as powerful as the RLS policies above allow. |
 | `VITE_ADMIN_PIN` | A 4-digit PIN, e.g. `2468` — the on-screen keypad is built for exactly 4 digits. |
 | `VITE_KID_NAME` | Optional — kid's first name, shown in the home feed greeting and avatar. |
 
@@ -55,30 +70,28 @@ in a `VITE_*` variable — including `VITE_ADMIN_PIN` — ends up in the built
 JS bundle and is technically viewable by anyone who opens dev tools. For a
 single-family, low-stakes use case this is an acceptable trade-off, but it's
 not a real secret. A future iteration could move PIN verification to a
-Supabase Edge Function once the schema is in place.
+Supabase Edge Function.
 
-### 3. Run locally
+### 4. Run locally
 
 ```bash
 npm run dev
 ```
 
-## Deploying to GitHub Pages
+## Deploying to Netlify
 
-A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and
-deploys automatically on every push to `main`.
+The repo includes a `netlify.toml` (build command `npm run build`, publish
+directory `dist`).
 
-One-time setup:
-
-1. In the repo settings → **Pages**, set the source to **GitHub Actions**.
-2. In repo settings → **Secrets and variables → Actions**, add repository
-   secrets matching your `.env.local`: `VITE_YOUTUBE_API_KEY`,
-   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ADMIN_PIN`.
-3. Push to `main` — the workflow builds the app and publishes `dist/` to
-   Pages.
-
-The app is configured to be served from `/watchwell/` (see `base` in
-`vite.config.js`) — update that if the repo is ever renamed.
+1. In Netlify, "Add a new site" → "Import an existing project" → point it at
+   this repo.
+2. Netlify will read `netlify.toml` automatically — no build settings to
+   configure by hand.
+3. Under **Site configuration → Environment variables**, add the same
+   variables as `.env.local`: `VITE_YOUTUBE_API_KEY`, `VITE_SUPABASE_URL`,
+   `VITE_SUPABASE_ANON_KEY`, `VITE_ADMIN_PIN`, and optionally `VITE_KID_NAME`.
+4. Deploy. The app uses `HashRouter` (routes live after `#`), so client-side
+   routing works on Netlify with no extra rewrite rules needed.
 
 To build manually:
 
@@ -97,8 +110,9 @@ src/
   components/admin/    Whitelist forms, dashboard shell (sidebar/top menu)
   components/shared/   Header, Logo, Avatar (shared brand components)
   services/            Data access — whitelist, watch history, time limits,
-                        feed cache (all localStorage for now), YouTube API
+                        feed cache, YouTube API (Supabase-backed)
   context/             Admin auth (PIN) context
   lib/                 Config/env, format helpers, YouTube IFrame API loader,
-                        avatar pastel-color helper
+                        Supabase client, avatar pastel-color helper
+supabase/migrations/    SQL schema (run once in the Supabase SQL editor)
 ```

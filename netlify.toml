@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# The app uses HashRouter (client-side routes live after '#'), so no SPA
+# rewrite rule is strictly required — but this is a harmless fallback for
+# any direct path request.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -5,7 +5,6 @@ import WatchPage from './routes/kid/WatchPage'
 import SearchResults from './routes/kid/SearchResults'
 import WatchHistoryPage from './routes/kid/WatchHistoryPage'
 import TimeUpScreen from './routes/kid/TimeUpScreen'
-import TimeLimitGate from './components/kid/TimeLimitGate'
 import RequireAdmin from './components/admin/RequireAdmin'
 import AdminLogin from './routes/admin/AdminLogin'
 import AdminShell from './components/admin/AdminShell'
@@ -18,46 +17,12 @@ import AdminSettings from './routes/admin/AdminSettings'
 export default function App() {
   return (
     <Routes>
-      <Route
-        path="/"
-        element={
-          <TimeLimitGate>
-            <KidShell>
-              <HomeFeed />
-            </KidShell>
-          </TimeLimitGate>
-        }
-      />
-      <Route
-        path="/search"
-        element={
-          <TimeLimitGate>
-            <KidShell>
-              <SearchResults />
-            </KidShell>
-          </TimeLimitGate>
-        }
-      />
-      <Route
-        path="/history"
-        element={
-          <TimeLimitGate>
-            <KidShell>
-              <WatchHistoryPage />
-            </KidShell>
-          </TimeLimitGate>
-        }
-      />
-      <Route
-        path="/watch/:videoId"
-        element={
-          <TimeLimitGate>
-            <KidShell>
-              <WatchPage />
-            </KidShell>
-          </TimeLimitGate>
-        }
-      />
+      <Route element={<KidShell />}>
+        <Route path="/" element={<HomeFeed />} />
+        <Route path="/search" element={<SearchResults />} />
+        <Route path="/history" element={<WatchHistoryPage />} />
+        <Route path="/watch/:videoId" element={<WatchPage />} />
+      </Route>
       <Route path="/time-up" element={<TimeUpScreen />} />
 
       <Route path="/admin" element={<AdminLogin />} />

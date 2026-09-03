@@ -1,32 +1,49 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AddChannelForm from '../../components/admin/AddChannelForm'
 import Avatar from '../../components/shared/Avatar'
 import {
   getWhitelistedChannels,
   removeWhitelistedChannel,
+  getAllApprovedVideos,
 } from '../../services/whitelistService'
-import { getCachedFeed } from '../../services/feedCache'
 
 export default function AdminChannels() {
-  const [channels, setChannels] = useState(getWhitelistedChannels)
+  const [channels, setChannels] = useState(null)
+  const [videos, setVideos] = useState([])
+  const [error, setError] = useState('')
 
-  function refresh() {
-    setChannels(getWhitelistedChannels())
+  async function refresh() {
+    try {
+      const [nextChannels, nextVideos] = await Promise.all([
+        getWhitelistedChannels(),
+        getAllApprovedVideos(),
+      ])
+      setChannels(nextChannels)
+      setVideos(nextVideos)
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
-  function handleRemove(channelId) {
-    removeWhitelistedChannel(channelId)
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  async function handleRemove(channelId) {
+    await removeWhitelistedChannel(channelId)
     refresh()
   }
-
-  const { videos } = getCachedFeed()
 
   return (
     <div>
       <AddChannelForm onAdded={refresh} />
 
+      {error ? <p className="mb-3 text-sm text-brand">{error}</p> : null}
+
       <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
-        {channels.length === 0 ? (
+        {channels === null ? (
+          <p className="p-5 text-sm text-text-faint">Loading…</p>
+        ) : channels.length === 0 ? (
           <p className="p-5 text-sm text-text-faint">No channels whitelisted yet.</p>
         ) : (
           channels.map((channel) => {
