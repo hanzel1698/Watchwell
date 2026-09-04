@@ -31,41 +31,47 @@ export async function isFeedStale() {
   return Date.now() - new Date(refreshedAt).getTime() > STALE_AFTER_MS
 }
 
+// Pulls one channel's latest uploads and upserts them into watchwell_videos.
+// Exported separately so adding a new channel can populate its videos
+// immediately, instead of waiting for the next scheduled/manual refresh.
+export async function refreshChannelUploads(channel) {
+  const uploadsPlaylistId = uploadsPlaylistIdFor(channel.channelId)
+  if (!uploadsPlaylistId) return
+
+  let uploads
+  try {
+    uploads = await getChannelUploads(uploadsPlaylistId)
+  } catch {
+    return // deleted/private channel shouldn't block whatever called this
+  }
+  if (uploads.length === 0) return
+
+  const durations = await getVideoDurations(uploads.map((v) => v.videoId)).catch(() => ({}))
+
+  const rows = uploads.map((v) => ({
+    youtube_video_id: v.videoId,
+    title: v.title,
+    thumbnail_url: v.thumbnailUrl,
+    duration_seconds: durations[v.videoId] ?? null,
+    published_at: v.publishedAt,
+    channel_id: channel.dbId,
+  }))
+
+  const { error } = await getSupabaseClient()
+    .from('watchwell_videos')
+    .upsert(rows, { onConflict: 'youtube_video_id' })
+  if (error) throw error
+}
+
 export async function refreshFeedCache() {
-  const supabase = getSupabaseClient()
   const channels = await getWhitelistedChannels()
 
   for (const channel of channels) {
-    const uploadsPlaylistId = uploadsPlaylistIdFor(channel.channelId)
-    if (!uploadsPlaylistId) continue
-
-    let uploads
-    try {
-      uploads = await getChannelUploads(uploadsPlaylistId)
-    } catch {
-      continue // one channel failing (deleted/private) shouldn't abort the whole refresh
-    }
-    if (uploads.length === 0) continue
-
-    const durations = await getVideoDurations(uploads.map((v) => v.videoId)).catch(() => ({}))
-
-    const rows = uploads.map((v) => ({
-      youtube_video_id: v.videoId,
-      title: v.title,
-      thumbnail_url: v.thumbnailUrl,
-      duration_seconds: durations[v.videoId] ?? null,
-      published_at: v.publishedAt,
-      channel_id: channel.dbId,
-    }))
-
-    const { error } = await supabase
-      .from('watchwell_videos')
-      .upsert(rows, { onConflict: 'youtube_video_id' })
-    if (error) throw error
+    await refreshChannelUploads(channel)
   }
 
   const refreshedAt = new Date().toISOString()
-  const { error } = await supabase
+  const { error } = await getSupabaseClient()
     .from('watchwell_settings')
     .upsert({ key: REFRESH_SETTING_KEY, value: refreshedAt }, { onConflict: 'key' })
   if (error) throw error

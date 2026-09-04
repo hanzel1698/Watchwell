@@ -73,18 +73,25 @@ export async function getWhitelistedVideos() {
 }
 
 // channel: { channelId, title, thumbnailUrl } from youtubeApi.resolveChannel
+// Returns the inserted row (mapped, with dbId) so the caller can immediately
+// fetch this channel's uploads without waiting for the next scheduled refresh.
 export async function addWhitelistedChannel(channel) {
-  const { error } = await getSupabaseClient().from('watchwell_channels').insert({
-    youtube_channel_id: channel.channelId,
-    channel_name: channel.title,
-    thumbnail_url: channel.thumbnailUrl,
-  })
+  const { data, error } = await getSupabaseClient()
+    .from('watchwell_channels')
+    .insert({
+      youtube_channel_id: channel.channelId,
+      channel_name: channel.title,
+      thumbnail_url: channel.thumbnailUrl,
+    })
+    .select()
+    .single()
   if (error) {
     if (error.code === '23505') {
       throw new Error(`Channel "${channel.title}" is already whitelisted.`)
     }
     throw error
   }
+  return mapChannelRow(data)
 }
 
 export async function removeWhitelistedChannel(channelId) {

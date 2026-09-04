@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { resolveChannel } from '../../services/youtubeApi'
 import { addWhitelistedChannel } from '../../services/whitelistService'
+import { refreshChannelUploads } from '../../services/feedCache'
 
 export default function AddChannelForm({ onAdded }) {
   const [input, setInput] = useState('')
   const [preview, setPreview] = useState(null)
-  const [status, setStatus] = useState('idle') // idle | loading | error
+  const [status, setStatus] = useState('idle') // idle | loading | confirming | error
   const [error, setError] = useState('')
 
   async function handleLookup(e) {
@@ -25,12 +26,21 @@ export default function AddChannelForm({ onAdded }) {
   }
 
   async function handleConfirm() {
+    setStatus('confirming')
     try {
-      await addWhitelistedChannel(preview)
+      const savedChannel = await addWhitelistedChannel(preview)
       setPreview(null)
       setInput('')
+      setStatus('idle')
+      onAdded() // show the channel right away, even before its videos load
+
+      // Pull this channel's uploads in immediately rather than waiting for
+      // the next scheduled/manual refresh — otherwise a freshly-added
+      // channel sits at "0 videos" until that next refresh happens.
+      await refreshChannelUploads(savedChannel)
       onAdded()
     } catch (err) {
+      setStatus('idle')
       setError(err.message)
     }
   }
@@ -64,9 +74,10 @@ export default function AddChannelForm({ onAdded }) {
           </div>
           <button
             onClick={handleConfirm}
-            className="rounded-[10px] bg-brand px-3.5 py-2 text-sm font-semibold text-white"
+            disabled={status === 'confirming'}
+            className="rounded-[10px] bg-brand px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            Confirm & whitelist
+            {status === 'confirming' ? 'Adding…' : 'Confirm & whitelist'}
           </button>
         </div>
       ) : null}
