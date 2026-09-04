@@ -4,7 +4,7 @@ import { loadYouTubeIframeApi } from '../../lib/youtubeIframeApi'
 import { getAllApprovedVideos } from '../../services/whitelistService'
 import { logWatch } from '../../services/watchHistoryService'
 import { isDailyLimitReached } from '../../services/timeLimitService'
-import { formatRelativeTime } from '../../lib/format'
+import { formatDuration, formatRelativeTime } from '../../lib/format'
 import Avatar from '../../components/shared/Avatar'
 import { BackIcon } from '../../components/kid/icons'
 
@@ -121,50 +121,64 @@ export default function WatchPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-7">
-      <button
-        onClick={() => navigate(-1)}
-        aria-label="Back"
-        className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white"
-      >
-        <BackIcon className="h-6 w-6" />
-      </button>
+    <div className="mx-auto max-w-[1400px] p-7 lg:flex lg:items-start lg:gap-8">
+      <div className="lg:min-w-0 lg:flex-1">
+        <button
+          onClick={() => navigate(-1)}
+          aria-label="Back"
+          className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white"
+        >
+          <BackIcon className="h-6 w-6" />
+        </button>
 
-      <div className="aspect-video w-full overflow-hidden rounded-[20px] bg-[#1c1917]">
-        <div ref={playerRef} className="h-full w-full" />
-      </div>
+        <div className="aspect-video w-full overflow-hidden rounded-[20px] bg-[#1c1917]">
+          <div ref={playerRef} className="h-full w-full" />
+        </div>
 
-      <h1 className="mt-5 font-heading text-2xl font-bold text-text">{video.title}</h1>
-      <div className="mt-3 flex items-center gap-3">
-        <Avatar label={video.channelTitle ?? video.title} />
-        <p className="text-base text-text-muted">
-          {video.channelTitle ?? 'Added by a parent'}
-          {video.publishedAt ? ` · ${formatRelativeTime(video.publishedAt)}` : ''}
-        </p>
+        <h1 className="mt-5 font-heading text-2xl font-bold text-text">{video.title}</h1>
+        <div className="mt-3 flex items-center gap-3">
+          <Avatar label={video.channelTitle ?? video.title} />
+          <p className="text-base text-text-muted">
+            {video.channelTitle ?? 'Added by a parent'}
+            {video.publishedAt ? ` · ${formatRelativeTime(video.publishedAt)}` : ''}
+          </p>
+        </div>
       </div>
 
       {upNext.length > 0 ? (
-        <>
-          <div className="my-7 h-px bg-border" />
+        // Stacked below the player on phones/narrow tablets; from lg (tablet
+        // landscape) up, it becomes a vertical sidebar to the right instead —
+        // matching how a real video-watching app lays out related videos.
+        <div className="mt-8 lg:mt-0 lg:w-[360px] lg:shrink-0">
           <h2 className="mb-4 font-heading text-xl font-bold text-text">Up next</h2>
-          <div className="flex flex-wrap gap-5">
+          <div className="flex flex-col gap-3">
             {upNext.map((v) => (
-              <Link key={v.videoId} to={`/watch/${v.videoId}`} className="w-[220px]">
-                <div className="aspect-video overflow-hidden rounded-[14px] bg-bg-alt">
+              <Link key={v.videoId} to={`/watch/${v.videoId}`} className="flex gap-2.5">
+                <div className="relative aspect-video w-[168px] shrink-0 overflow-hidden rounded-[10px] bg-bg-alt">
                   <img
                     src={v.thumbnailUrl}
                     alt={v.title}
                     className="h-full w-full object-cover"
                     loading="lazy"
                   />
+                  {v.durationSeconds ? (
+                    <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white">
+                      {formatDuration(v.durationSeconds)}
+                    </span>
+                  ) : null}
                 </div>
-                <p className="mt-2 line-clamp-2 text-[15px] font-semibold leading-tight text-text">
-                  {v.title}
-                </p>
+                <div className="min-w-0">
+                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-text">
+                    {v.title}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-text-muted">
+                    {v.channelTitle ?? 'Added by a parent'}
+                  </p>
+                </div>
               </Link>
             ))}
           </div>
-        </>
+        </div>
       ) : null}
     </div>
   )
