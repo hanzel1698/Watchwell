@@ -143,7 +143,9 @@ export async function resolveVideo(rawInput) {
 
 // Fetches the most recent uploads from a channel's uploads playlist. Meant
 // to be called sparingly (admin dashboard refresh / scheduled job), not on
-// every kid page load — results should be cached by the caller.
+// every kid page load — results should be cached by the caller. Shorts
+// (titled with a #shorts/#short hashtag, the common convention) are
+// filtered out, along with private/deleted videos.
 export async function getChannelUploads(uploadsPlaylistId, maxResults = 25) {
   const data = await apiGet('playlistItems', {
     part: 'snippet,contentDetails',
@@ -152,7 +154,12 @@ export async function getChannelUploads(uploadsPlaylistId, maxResults = 25) {
   })
 
   return (data.items ?? [])
-    .filter((item) => item.snippet.title !== 'Private video' && item.snippet.title !== 'Deleted video')
+    .filter(
+      (item) =>
+        item.snippet.title !== 'Private video' &&
+        item.snippet.title !== 'Deleted video' &&
+        !/#shorts?\b/i.test(item.snippet.title),
+    )
     .map((item) => ({
       videoId: item.contentDetails.videoId,
       title: item.snippet.title,
