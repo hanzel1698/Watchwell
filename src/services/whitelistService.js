@@ -12,6 +12,10 @@
 // returns only the individually-whitelisted ones, for the admin's
 // "Manage Videos" list.
 //
+// Since migration 0003 the FK cascades on delete, so channel_id null means
+// "the admin picked this video individually" and nothing else — removing a
+// channel takes its cached uploads with it instead of orphaning them.
+//
 // Known schema limitation: watchwell_videos has no channel-name column of
 // its own, only the nullable FK to watchwell_channels. So an individually
 // whitelisted video (channel_id null) has no persisted channel name —
@@ -124,10 +128,13 @@ export async function removeWhitelistedChannel(channelId) {
   if (lookupError) throw lookupError
   if (!channel) return
 
-  // Delete the channel's cached uploads first. The FK is ON DELETE SET NULL,
-  // so leaving them behind would silently reclassify them as
-  // individually-whitelisted videos — still in the kid's feed, and exempt
-  // from the minimum-length filter, after the admin removed the channel.
+  // Delete the channel's cached uploads first. Migration 0003 makes the FK
+  // ON DELETE CASCADE, which handles this at the database level whatever
+  // route the delete takes — but doing it here too means the app still
+  // behaves correctly against a database that only has 0001/0002, where the
+  // FK is still ON DELETE SET NULL and orphaned uploads would otherwise be
+  // silently reclassified as individually-whitelisted videos: left in the
+  // kid's feed and exempt from the minimum-length rule.
   const { error: videosError } = await supabase
     .from('watchwell_videos')
     .delete()

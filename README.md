@@ -35,7 +35,7 @@ either.
 
 | Rule | Behaviour |
 |---|---|
-| **Minimum length** (default 20 min, admin-adjustable in Settings, 0 to disable) | Hides shorter uploads pulled in from whitelisted channels. A video the admin whitelists *individually* is exempt — that's a deliberate pick, not the automatic firehose. A channel upload whose duration hasn't been resolved yet is hidden until the next feed refresh fills it in. |
+| **Minimum length** (default 20 min, admin-adjustable in Settings, 0 to disable) | Hides shorter uploads pulled in from whitelisted channels. A video the admin whitelists *individually* is exempt — that's a deliberate pick, not the automatic firehose. A channel upload whose duration hasn't been resolved yet is hidden until the next feed refresh fills it in. The exemption keys off `channel_id IS NULL`, which only reliably means "picked by hand" once migration `0003` is applied. |
 | **No live video** | Live and scheduled broadcasts are never shown, however they were added, and `Add Video` refuses one outright. A continuous stream has no end to reach and no length to measure. The *archived recording* of a finished broadcast isn't live — it's an ordinary video, judged on length like any other. |
 
 Both rules are applied when videos are **read**, not when they're fetched
@@ -46,6 +46,46 @@ was making anyway. Filtering on read (rather than dropping short videos at
 ingest) means changing the minimum takes effect immediately, with no refresh
 and no further API calls — and the admin dashboard can still show how many
 videos the rules are holding back, per channel and overall.
+
+### Cleaning up orphaned videos
+
+Before migration `0003`, `channel_id` was `ON DELETE SET NULL`: removing a
+channel left its cached uploads behind with no channel. Those orphans are
+indistinguishable from videos whitelisted by hand, so they stay in the kid's
+feed, appear in **Manage Videos** labelled "Added by a parent", and inherit
+the hand-picked exemption from the minimum-length rule. `0003` stops new ones
+appearing but deliberately doesn't delete existing ones — no column tells
+them apart from videos you chose deliberately.
+
+A channel refresh writes its uploads in one batch, so orphans cluster on a
+single timestamp while hand-picked videos are scattered singletons. Group
+them to see which is which:
+
+```sql
+select
+  date_trunc('second', added_at) as added_batch,
+  count(*)                       as videos,
+  min(title)                     as example_title
+from watchwell_videos
+where channel_id is null
+group by 1
+order by videos desc, added_batch;
+```
+
+Rows with a high `videos` count are almost certainly orphans from a removed
+channel. Delete a batch once you've confirmed it:
+
+```sql
+delete from watchwell_videos
+where channel_id is null
+  and date_trunc('second', added_at) = '2026-01-01 12:00:00+00'::timestamptz;
+```
+
+Or, if you never whitelisted any videos individually, clear them all at once:
+
+```sql
+delete from watchwell_videos where channel_id is null;
+```
 
 **Known schema limitation:** `watchwell_videos` only has a channel name via
 its (nullable) FK to `watchwell_channels`. A video the admin whitelists
@@ -86,6 +126,10 @@ In your Supabase project's SQL editor, run the files in
 - `0002_content_filters.sql` adds `watchwell_videos.is_live` and seeds the
   minimum-video-length setting. Required — feed refreshes write `is_live`, so
   they'll fail against a database that only has `0001`.
+- `0003_cascade_channel_videos.sql` changes `watchwell_videos.channel_id` to
+  `ON DELETE CASCADE`, so removing a channel removes its cached uploads
+  instead of orphaning them. See "Cleaning up orphaned videos" below if you
+  removed any channels before running this.
 
 ### 3. Add your API keys
 
