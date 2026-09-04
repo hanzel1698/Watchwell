@@ -75,8 +75,21 @@ export default function WatchPage() {
         // required by YouTube's embed terms, not something this API
         // exposes a toggle for. modestbranding is dropped since YouTube
         // deprecated it in 2018 and it no longer does anything.
-        playerVars: { rel: 0, disablekb: 1, iv_load_policy: 3 },
+        //
+        // autoplay:1 starts the video without the kid having to find the
+        // play button. Deliberately not paired with mute:1 — that would
+        // make autoplay unconditional, but a silent video is worse than a
+        // play button for a child who may not know how to unmute.
+        playerVars: { rel: 0, disablekb: 1, iv_load_policy: 3, autoplay: 1 },
         events: {
+          // The autoplay player var alone is unreliable when the player is
+          // constructed after the page has settled, so ask again once the
+          // player says it's ready. Browsers block unmuted autoplay without
+          // a user gesture, but the kid got here by tapping a video card, so
+          // the document is nearly always activated by this point. When a
+          // browser does refuse, the player just shows its poster and play
+          // button — exactly how this page behaved before.
+          onReady: (event) => event.target.playVideo(),
           onStateChange: (event) => {
             lastTickRef.current = event.data === YT.PlayerState.PLAYING ? Date.now() : null
           },
