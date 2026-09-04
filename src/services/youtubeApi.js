@@ -144,7 +144,7 @@ export async function resolveVideo(rawInput) {
 // Fetches the most recent uploads from a channel's uploads playlist. Meant
 // to be called sparingly (admin dashboard refresh / scheduled job), not on
 // every kid page load — results should be cached by the caller.
-export async function getChannelUploads(uploadsPlaylistId, maxResults = 15) {
+export async function getChannelUploads(uploadsPlaylistId, maxResults = 25) {
   const data = await apiGet('playlistItems', {
     part: 'snippet,contentDetails',
     playlistId: uploadsPlaylistId,
