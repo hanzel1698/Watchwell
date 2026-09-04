@@ -38,7 +38,7 @@ export default function WatchPage() {
           return
         }
         setVideo(found)
-        setUpNext(catalog.filter((v) => v.videoId !== videoId).slice(0, 4))
+        setUpNext(catalog.filter((v) => v.videoId !== videoId).slice(0, 15))
         setStatus('ready')
       })
       .catch(() => setStatus('not-found'))
@@ -149,9 +149,11 @@ export default function WatchPage() {
         // Stacked below the player on phones/narrow tablets; from lg (tablet
         // landscape) up, it becomes a vertical sidebar to the right instead —
         // matching how a real video-watching app lays out related videos.
-        <div className="mt-8 lg:mt-0 lg:w-[360px] lg:shrink-0">
+        // The heading stays put (sticky) while just the list beneath it
+        // scrolls independently once it's taller than the viewport.
+        <div className="mt-8 lg:sticky lg:top-7 lg:mt-0 lg:w-[360px] lg:shrink-0">
           <h2 className="mb-4 font-heading text-xl font-bold text-text">Up next</h2>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-1">
             {upNext.map((v) => (
               <Link key={v.videoId} to={`/watch/${v.videoId}`} className="flex gap-2.5">
                 <div className="relative aspect-video w-[168px] shrink-0 overflow-hidden rounded-[10px] bg-bg-alt">
