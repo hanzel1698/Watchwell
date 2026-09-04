@@ -6,7 +6,6 @@ import { logWatch } from '../../services/watchHistoryService'
 import { isDailyLimitReached } from '../../services/timeLimitService'
 import { formatDuration, formatRelativeTime } from '../../lib/format'
 import Avatar from '../../components/shared/Avatar'
-import { BackIcon } from '../../components/kid/icons'
 
 const LIMIT_CHECK_INTERVAL_MS = 15_000
 
@@ -123,14 +122,6 @@ export default function WatchPage() {
   return (
     <div className="mx-auto max-w-[1400px] p-7 lg:flex lg:items-start lg:gap-8">
       <div className="lg:min-w-0 lg:flex-1">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Back"
-          className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white"
-        >
-          <BackIcon className="h-6 w-6" />
-        </button>
-
         <div className="aspect-video w-full overflow-hidden rounded-[20px] bg-[#1c1917]">
           <div ref={playerRef} className="h-full w-full" />
         </div>
