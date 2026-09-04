@@ -18,8 +18,11 @@ export default function AdminShell() {
   const location = useLocation()
 
   function handleLock() {
+    // logout() alone would already end up here via RequireAdmin's own
+    // redirect-to-"/" guard, but navigating explicitly makes the transition
+    // immediate rather than waiting on that reactive re-render.
+    navigate('/')
     logout()
-    navigate('/admin')
   }
 
   return (
