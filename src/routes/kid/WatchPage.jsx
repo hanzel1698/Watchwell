@@ -68,7 +68,14 @@ export default function WatchPage() {
       if (disposed) return
       playerInstanceRef.current = new YT.Player(playerRef.current, {
         videoId: video.videoId,
-        playerVars: { rel: 0, modestbranding: 1 },
+        // rel:0 limits end-of-video suggestions to the same channel;
+        // disablekb/iv_load_policy close off keyboard shortcuts and
+        // clickable annotations as extra exit routes. The control bar's
+        // YouTube logo (linking to youtube.com) can't be removed — it's
+        // required by YouTube's embed terms, not something this API
+        // exposes a toggle for. modestbranding is dropped since YouTube
+        // deprecated it in 2018 and it no longer does anything.
+        playerVars: { rel: 0, disablekb: 1, iv_load_policy: 3 },
         events: {
           onStateChange: (event) => {
             lastTickRef.current = event.data === YT.PlayerState.PLAYING ? Date.now() : null

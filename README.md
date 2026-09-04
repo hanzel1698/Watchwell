@@ -29,6 +29,17 @@ individually (not via a whole channel) has `channel_id = null`, so it has no
 persisted channel name — the UI falls back to "Added by a parent" for those
 cards rather than making an extra YouTube API call per video.
 
+**Known platform limitation:** the embedded player's control bar always
+shows a small YouTube logo that links out to youtube.com, and the video
+title overlay is likewise a link back to YouTube — both are required by
+YouTube's own embed terms and can't be removed via the IFrame Player API
+(the player also runs in a cross-origin iframe, so there's no way to
+intercept or hide that click from the parent page even with a workaround).
+`WatchPage` sets `disablekb` and `iv_load_policy` to close off keyboard
+shortcuts and clickable annotations as easier, more common exit routes, but
+the logo link itself is an inherent tradeoff of using YouTube's official,
+ToS-compliant embed rather than an unofficial player.
+
 ## Setup
 
 ### 1. Install dependencies
