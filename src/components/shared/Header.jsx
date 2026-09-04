@@ -1,9 +1,17 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import Logo from './Logo'
 import Avatar from './Avatar'
 import { getKidName } from '../../lib/config'
-import { SearchIcon } from '../kid/icons'
+import { SearchIcon, HomeIcon, HistoryIcon } from '../kid/icons'
+
+function navClasses({ isActive }) {
+  // Hidden on mobile, where BottomNav already provides Home/History — the same
+  // split SideNav used before these links moved into the header.
+  return `hidden shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold font-sans transition-colors sm:flex ${
+    isActive ? 'bg-brand-tint text-brand' : 'text-text-muted hover:bg-bg-alt'
+  }`
+}
 
 export default function Header() {
   const navigate = useNavigate()
@@ -21,6 +29,15 @@ export default function Header() {
         <span className="font-heading text-lg font-bold text-text">WatchWell</span>
       </Link>
 
+      <NavLink to="/" end className={navClasses}>
+        <HomeIcon className="h-[18px] w-[18px]" />
+        <span>Home</span>
+      </NavLink>
+      <NavLink to="/history" className={navClasses}>
+        <HistoryIcon className="h-[18px] w-[18px]" />
+        <span>History</span>
+      </NavLink>
+
       <form onSubmit={handleSubmit} className="flex w-full max-w-[520px] items-center">
         <input
           value={query}
@@ -34,12 +51,7 @@ export default function Header() {
         </button>
       </form>
 
-      <Link
-        to="/admin"
-        aria-label="Admin"
-        className="ml-auto shrink-0"
-        title="Parent access"
-      >
+      <Link to="/admin" aria-label="Admin" className="ml-auto shrink-0" title="Parent access">
         <Avatar label={getKidName()} />
       </Link>
     </header>
