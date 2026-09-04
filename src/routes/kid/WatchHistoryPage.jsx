@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import VideoGrid from '../../components/kid/VideoGrid'
 import { getWatchHistory } from '../../services/watchHistoryService'
-import { getAllApprovedVideos } from '../../services/whitelistService'
+import { getKidFeedVideos } from '../../services/whitelistService'
 
 // Shows the videos the kid has watched, most-recently-watched first,
 // deduplicated by video. Not editable here — that's the admin's job.
@@ -9,7 +9,7 @@ export default function WatchHistoryPage() {
   const [videos, setVideos] = useState(null)
 
   useEffect(() => {
-    Promise.all([getWatchHistory(), getAllApprovedVideos()])
+    Promise.all([getWatchHistory(), getKidFeedVideos()])
       .then(([history, catalog]) => {
         const byId = new Map(catalog.map((v) => [v.videoId, v]))
         const seen = new Set()

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import VideoGrid from '../../components/kid/VideoGrid'
-import { getAllApprovedVideos } from '../../services/whitelistService'
+import { getKidFeedVideos } from '../../services/whitelistService'
 import { getKidName } from '../../lib/config'
 
 export default function HomeFeed() {
@@ -8,7 +8,7 @@ export default function HomeFeed() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getAllApprovedVideos()
+    getKidFeedVideos()
       .then(setVideos)
       .catch((err) => setError(err.message))
   }, [])

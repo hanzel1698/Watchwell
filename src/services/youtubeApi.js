@@ -68,6 +68,16 @@ export function parseYouTubeInput(rawInput) {
   return { type: 'unknown', value: input }
 }
 
+// snippet.liveBroadcastContent is 'live' while a broadcast is streaming and
+// 'upcoming' while one is scheduled. It's 'none' for everything else —
+// including the archived recording of a broadcast that has ended, which by
+// then is an ordinary video with a fixed duration, so those aren't treated
+// as live here.
+export function isLiveBroadcast(snippet) {
+  const state = snippet?.liveBroadcastContent
+  return state === 'live' || state === 'upcoming'
+}
+
 function toChannelSummary(channelResource) {
   return {
     channelId: channelResource.id,
@@ -115,7 +125,8 @@ export async function resolveChannel(rawInput) {
 }
 
 // Resolves any pasted video reference into
-// { videoId, title, channelId, channelTitle, thumbnailUrl, durationSeconds, publishedAt }.
+// { videoId, title, channelId, channelTitle, thumbnailUrl, durationSeconds,
+//   publishedAt, isLive }.
 export async function resolveVideo(rawInput) {
   const parsed = parseYouTubeInput(rawInput)
   if (parsed.type !== 'videoId') {
@@ -136,8 +147,10 @@ export async function resolveVideo(rawInput) {
     channelTitle: video.snippet.channelTitle,
     thumbnailUrl:
       video.snippet.thumbnails?.medium?.url ?? video.snippet.thumbnails?.default?.url,
+    // Live/upcoming broadcasts report a duration of "P0D", which parses to 0.
     durationSeconds: parseIso8601Duration(video.contentDetails.duration),
     publishedAt: video.snippet.publishedAt,
+    isLive: isLiveBroadcast(video.snippet),
   }
 }
 
@@ -187,15 +200,23 @@ export function uploadsPlaylistIdFor(channelId) {
   return channelId?.startsWith('UC') ? `UU${channelId.slice(2)}` : null
 }
 
-// Batch-fetches durations for a set of video IDs (used when caching a
-// channel's uploads — playlistItems doesn't include duration, so this is
-// one extra call per channel refresh rather than one per video).
-export async function getVideoDurations(videoIds) {
+// Batch-fetches duration and live status for a set of video IDs, keyed by
+// video ID (used when caching a channel's uploads — playlistItems carries
+// neither, so this is one extra call per channel refresh rather than one per
+// video). videos.list costs the same single quota unit whatever parts are
+// requested, so asking for snippet alongside contentDetails is free.
+export async function getVideoDetails(videoIds) {
   if (videoIds.length === 0) return {}
-  const data = await apiGet('videos', { part: 'contentDetails', id: videoIds.join(',') })
-  const durations = {}
+  const data = await apiGet('videos', {
+    part: 'contentDetails,snippet',
+    id: videoIds.join(','),
+  })
+  const details = {}
   for (const item of data.items ?? []) {
-    durations[item.id] = parseIso8601Duration(item.contentDetails.duration)
+    details[item.id] = {
+      durationSeconds: parseIso8601Duration(item.contentDetails.duration),
+      isLive: isLiveBroadcast(item.snippet),
+    }
   }
-  return durations
+  return details
 }

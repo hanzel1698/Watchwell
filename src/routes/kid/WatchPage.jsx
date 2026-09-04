@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { loadYouTubeIframeApi } from '../../lib/youtubeIframeApi'
-import { getAllApprovedVideos } from '../../services/whitelistService'
+import { getKidFeedVideos } from '../../services/whitelistService'
 import { logWatch } from '../../services/watchHistoryService'
 import { isDailyLimitReached } from '../../services/timeLimitService'
 import { formatDuration, formatRelativeTime } from '../../lib/format'
@@ -22,13 +22,14 @@ export default function WatchPage() {
   const [video, setVideo] = useState(null)
   const [upNext, setUpNext] = useState([])
 
-  // Loads the whitelist catalog and finds this video in it — a video that
-  // isn't in the (whitelist-only) catalog simply isn't found, so this page
-  // refuses to play it.
+  // Loads the kid catalog and finds this video in it — a video that isn't in
+  // the catalog (not whitelisted, or shorter than the admin's minimum length)
+  // simply isn't found, so this page refuses to play it even if the URL is
+  // reached directly.
   useEffect(() => {
     let cancelled = false
     setStatus('loading')
-    getAllApprovedVideos()
+    getKidFeedVideos()
       .then((catalog) => {
         if (cancelled) return
         const found = catalog.find((v) => v.videoId === videoId)

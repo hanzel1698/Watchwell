@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import VideoGrid from '../../components/kid/VideoGrid'
-import { getAllApprovedVideos } from '../../services/whitelistService'
+import { getKidFeedVideos } from '../../services/whitelistService'
 import { SearchIcon } from '../../components/kid/icons'
 
-// Filters the whitelist catalog client-side only — never calls YouTube's
-// public search endpoint, which would surface non-whitelisted content.
+// Filters the kid catalog client-side only — never calls YouTube's public
+// search endpoint, which would surface non-whitelisted content. The catalog
+// is already length-filtered, so short uploads aren't findable by search
+// either, not just absent from the home feed.
 export default function SearchResults() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [input, setInput] = useState(searchParams.get('q') ?? '')
@@ -13,7 +15,7 @@ export default function SearchResults() {
   const query = input.trim().toLowerCase()
 
   useEffect(() => {
-    getAllApprovedVideos()
+    getKidFeedVideos()
       .then(setCatalog)
       .catch(() => setCatalog([]))
   }, [])

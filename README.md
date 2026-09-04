@@ -14,14 +14,38 @@ and all app data (whitelist, watch history, settings) lives in Supabase.
 ## Status
 
 Routing, the kid-facing feed/search/watch/history pages, and the admin
-dashboard (whitelist management, watch history, daily time limit) are wired
-up against a real Supabase backend — see `supabase/migrations/0001_watchwell_schema.sql`
-for the schema and `src/services/*.js` for the data-access layer.
+dashboard (whitelist management, watch history, daily time limit, content
+rules) are wired up against a real Supabase backend — see
+`supabase/migrations/` for the schema and `src/services/*.js` for the
+data-access layer.
 
 Visual design follows the approved mockup: warm cream background, red brand
 accent, Baloo 2 (headings) + Inter (body) fonts, a PIN-keypad admin gate, and
 a dark sidebar admin dashboard. See `src/index.css` (`@theme` block) for the
 full design token list.
+
+## What the kid can see
+
+Beyond the whitelist itself, two rules narrow what reaches the kid's feed.
+Both live in `src/services/contentFilterService.js` and are applied by
+`whitelistService.getKidFeedVideos()`, which every kid-facing page reads —
+home feed, search, "up next", history, and the watch page's own
+is-this-allowed check — so a filtered-out video can't be reached by URL
+either.
+
+| Rule | Behaviour |
+|---|---|
+| **Minimum length** (default 20 min, admin-adjustable in Settings, 0 to disable) | Hides shorter uploads pulled in from whitelisted channels. A video the admin whitelists *individually* is exempt — that's a deliberate pick, not the automatic firehose. A channel upload whose duration hasn't been resolved yet is hidden until the next feed refresh fills it in. |
+| **No live video** | Live and scheduled broadcasts are never shown, however they were added, and `Add Video` refuses one outright. A continuous stream has no end to reach and no length to measure. The *archived recording* of a finished broadcast isn't live — it's an ordinary video, judged on length like any other. |
+
+Both rules are applied when videos are **read**, not when they're fetched
+from YouTube, and this costs nothing extra in API quota: `videos.list`
+charges the same single unit whichever parts it's asked for, so the feed
+refresh already pulls duration and live status in the one batched call it
+was making anyway. Filtering on read (rather than dropping short videos at
+ingest) means changing the minimum takes effect immediately, with no refresh
+and no further API calls — and the admin dashboard can still show how many
+videos the rules are holding back, per channel and overall.
 
 **Known schema limitation:** `watchwell_videos` only has a channel name via
 its (nullable) FK to `watchwell_channels`. A video the admin whitelists
@@ -48,15 +72,20 @@ ToS-compliant embed rather than an unofficial player.
 npm install
 ```
 
-### 2. Run the Supabase migration
+### 2. Run the Supabase migrations
 
-In your Supabase project's SQL editor, run
-`supabase/migrations/0001_watchwell_schema.sql`. It creates four
-`watchwell_`-prefixed tables (channels, videos, watch history, settings)
-without touching anything else in your project, and enables RLS with a
-permissive "allow all" policy — reasonable for a single-user personal app
-using the anon key, called out explicitly here in case you add real
-multi-user auth later and want to tighten it.
+In your Supabase project's SQL editor, run the files in
+`supabase/migrations/` in filename order:
+
+- `0001_watchwell_schema.sql` creates four `watchwell_`-prefixed tables
+  (channels, videos, watch history, settings) without touching anything else
+  in your project, and enables RLS with a permissive "allow all" policy —
+  reasonable for a single-user personal app using the anon key, called out
+  explicitly here in case you add real multi-user auth later and want to
+  tighten it.
+- `0002_content_filters.sql` adds `watchwell_videos.is_live` and seeds the
+  minimum-video-length setting. Required — feed refreshes write `is_live`, so
+  they'll fail against a database that only has `0001`.
 
 ### 3. Add your API keys
 
@@ -121,9 +150,9 @@ src/
   components/admin/    Whitelist forms, dashboard shell (sidebar/top menu)
   components/shared/   Header, Logo, Avatar (shared brand components)
   services/            Data access — whitelist, watch history, time limits,
-                        feed cache, YouTube API (Supabase-backed)
+                        content rules, feed cache, YouTube API (Supabase-backed)
   context/             Admin auth (PIN) context
   lib/                 Config/env, format helpers, YouTube IFrame API loader,
                         Supabase client, avatar pastel-color helper
-supabase/migrations/    SQL schema (run once in the Supabase SQL editor)
+supabase/migrations/    SQL schema (run in filename order in the Supabase SQL editor)
 ```

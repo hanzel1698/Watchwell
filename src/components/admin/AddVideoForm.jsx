@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { resolveVideo } from '../../services/youtubeApi'
 import { addWhitelistedVideo } from '../../services/whitelistService'
+import { formatDuration } from '../../lib/format'
 
 export default function AddVideoForm({ onAdded }) {
   const [input, setInput] = useState('')
@@ -58,16 +59,32 @@ export default function AddVideoForm({ onAdded }) {
       {preview ? (
         <div className="mt-3 flex items-center gap-3 rounded-[12px] border border-border bg-surface p-3">
           <img src={preview.thumbnailUrl} alt="" className="h-12 w-20 rounded-lg object-cover" />
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <p className="font-semibold text-text">{preview.title}</p>
-            <p className="text-sm text-text-muted">{preview.channelTitle}</p>
+            <p className="text-sm text-text-muted">
+              {preview.channelTitle}
+              {preview.isLive
+                ? ' · Live'
+                : preview.durationSeconds
+                  ? ` · ${formatDuration(preview.durationSeconds)}`
+                  : ''}
+            </p>
           </div>
-          <button
-            onClick={handleConfirm}
-            className="rounded-[10px] bg-brand px-3.5 py-2 text-sm font-semibold text-white"
-          >
-            Confirm & whitelist
-          </button>
+          {/* Live streams can't be whitelisted at all, so say why up front
+              rather than offering a button that only fails on click. */}
+          {preview.isLive ? (
+            <p className="max-w-[220px] text-sm font-medium text-brand">
+              Live streams can't be added — add the recording once the broadcast
+              has ended.
+            </p>
+          ) : (
+            <button
+              onClick={handleConfirm}
+              className="shrink-0 rounded-[10px] bg-brand px-3.5 py-2 text-sm font-semibold text-white"
+            >
+              Confirm &amp; whitelist
+            </button>
+          )}
         </div>
       ) : null}
     </div>

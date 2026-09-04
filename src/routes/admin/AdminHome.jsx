@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import { getWhitelistedChannels, getAllApprovedVideos } from '../../services/whitelistService'
 import { getDailyLimitMinutes, getWatchedSecondsToday } from '../../services/timeLimitService'
 import { refreshFeedCache, isFeedStale, getFeedRefreshedAt } from '../../services/feedCache'
+import {
+  getMinDurationMinutes,
+  meetsKidFeedCriteria,
+} from '../../services/contentFilterService'
 
 function StatCard({ label, children }) {
   return (
@@ -21,15 +25,25 @@ export default function AdminHome() {
   const [refreshedAt, setRefreshedAt] = useState(null)
 
   async function loadStats() {
-    const [channels, videos, limitMinutes, watchedSeconds] = await Promise.all([
-      getWhitelistedChannels(),
-      getAllApprovedVideos(),
-      getDailyLimitMinutes(),
-      getWatchedSecondsToday(),
-    ])
+    const [channels, videos, limitMinutes, watchedSeconds, minDurationMinutes] =
+      await Promise.all([
+        getWhitelistedChannels(),
+        getAllApprovedVideos(),
+        getDailyLimitMinutes(),
+        getWatchedSecondsToday(),
+        getMinDurationMinutes(),
+      ])
+    // The count the kid actually sees, so a feed that looks emptier than the
+    // whitelist suggests has a visible explanation here rather than being a
+    // mystery.
+    const visibleCount = videos.filter((v) =>
+      meetsKidFeedCriteria(v, minDurationMinutes),
+    ).length
     setStats({
       channelCount: channels.length,
       videoCount: videos.length,
+      hiddenCount: videos.length - visibleCount,
+      minDurationMinutes,
       limitMinutes,
       watchedMinutes: Math.round(watchedSeconds / 60),
     })
@@ -82,6 +96,12 @@ export default function AdminHome() {
         </StatCard>
         <StatCard label="Approved Videos">
           <p className="font-heading text-[30px] font-bold text-text">{stats.videoCount}</p>
+          {stats.hiddenCount > 0 ? (
+            <p className="mt-1.5 text-[13px] text-text-muted">
+              {stats.hiddenCount} hidden — live, or under{' '}
+              {stats.minDurationMinutes} min
+            </p>
+          ) : null}
         </StatCard>
       </div>
 

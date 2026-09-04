@@ -5,9 +5,12 @@
 //   - channel_id set   -> a cached upload from a whitelisted channel
 //                          (written by feedCache.refreshFeedCache)
 //   - channel_id null  -> a video the admin whitelisted individually
-// getAllApprovedVideos() returns both (that's the kid's full catalog);
-// getWhitelistedVideos() returns only the individually-whitelisted ones,
-// for the admin's "Manage Videos" list.
+// getAllApprovedVideos() returns both (the admin's view of everything
+// approved); getKidFeedVideos() narrows that to what the kid may actually
+// see, dropping live streams and channel uploads under the admin's
+// minimum-length setting (see contentFilterService); getWhitelistedVideos()
+// returns only the individually-whitelisted ones, for the admin's
+// "Manage Videos" list.
 //
 // Known schema limitation: watchwell_videos has no channel-name column of
 // its own, only the nullable FK to watchwell_channels. So an individually
@@ -16,6 +19,7 @@
 // generic label rather than an extra YouTube API call per video.
 
 import { getSupabaseClient } from '../lib/supabaseClient'
+import { getMinDurationMinutes, meetsKidFeedCriteria } from './contentFilterService'
 
 function mapChannelRow(row) {
   return {
@@ -34,6 +38,7 @@ function mapVideoRow(row) {
     title: row.title,
     thumbnailUrl: row.thumbnail_url,
     durationSeconds: row.duration_seconds,
+    isLive: row.is_live ?? false,
     channelId: row.watchwell_channels?.youtube_channel_id ?? null,
     channelTitle: row.watchwell_channels?.channel_name ?? null,
     publishedAt: row.published_at,
@@ -51,7 +56,7 @@ export async function getWhitelistedChannels() {
 }
 
 // Every approved video (individually whitelisted + cached channel
-// uploads), newest upload first — this is the kid's home feed / search catalog.
+// uploads), newest upload first — the admin's full view, unfiltered.
 export async function getAllApprovedVideos() {
   const { data, error } = await getSupabaseClient()
     .from('watchwell_videos')
@@ -59,6 +64,20 @@ export async function getAllApprovedVideos() {
     .order('published_at', { ascending: false, nullsFirst: false })
   if (error) throw error
   return data.map(mapVideoRow)
+}
+
+// The kid's catalog: approved videos that also pass the content rules in
+// contentFilterService (no live streams, and long enough). Every kid-facing
+// surface (home feed, search, "up next", history, and the watch page's own
+// is-this-allowed check) reads this instead of getAllApprovedVideos, so those
+// rules are a real gate rather than just a tweak to what the home feed
+// happens to list.
+export async function getKidFeedVideos() {
+  const [videos, minDurationMinutes] = await Promise.all([
+    getAllApprovedVideos(),
+    getMinDurationMinutes(),
+  ])
+  return videos.filter((video) => meetsKidFeedCriteria(video, minDurationMinutes))
 }
 
 // Individually-whitelisted videos only — for the admin "Manage Videos" list.
@@ -95,21 +114,52 @@ export async function addWhitelistedChannel(channel) {
 }
 
 export async function removeWhitelistedChannel(channelId) {
-  const { error } = await getSupabaseClient()
+  const supabase = getSupabaseClient()
+
+  const { data: channel, error: lookupError } = await supabase
+    .from('watchwell_channels')
+    .select('id')
+    .eq('youtube_channel_id', channelId)
+    .maybeSingle()
+  if (lookupError) throw lookupError
+  if (!channel) return
+
+  // Delete the channel's cached uploads first. The FK is ON DELETE SET NULL,
+  // so leaving them behind would silently reclassify them as
+  // individually-whitelisted videos — still in the kid's feed, and exempt
+  // from the minimum-length filter, after the admin removed the channel.
+  const { error: videosError } = await supabase
+    .from('watchwell_videos')
+    .delete()
+    .eq('channel_id', channel.id)
+  if (videosError) throw videosError
+
+  const { error } = await supabase
     .from('watchwell_channels')
     .delete()
     .eq('youtube_channel_id', channelId)
   if (error) throw error
 }
 
-// video: { videoId, title, thumbnailUrl, durationSeconds, publishedAt }
+// video: { videoId, title, thumbnailUrl, durationSeconds, publishedAt, isLive }
 // from youtubeApi.resolveVideo
 export async function addWhitelistedVideo(video) {
+  // Live streams are refused outright rather than stored and hidden — unlike
+  // a short video, there's no length an admin could dial down to make one
+  // playable, so accepting it would just add a row that never shows up.
+  if (video.isLive) {
+    throw new Error(
+      `"${video.title}" is a live stream. WatchWell doesn't play live video — ` +
+        `add the recording once the broadcast has ended.`,
+    )
+  }
+
   const { error } = await getSupabaseClient().from('watchwell_videos').insert({
     youtube_video_id: video.videoId,
     title: video.title,
     thumbnail_url: video.thumbnailUrl,
     duration_seconds: video.durationSeconds,
+    is_live: false,
     published_at: video.publishedAt,
     channel_id: null,
   })
