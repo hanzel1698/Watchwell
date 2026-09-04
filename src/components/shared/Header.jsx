@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import Logo from './Logo'
 import Avatar from './Avatar'
 import { getKidName } from '../../lib/config'
-import { SearchIcon, HomeIcon, HistoryIcon } from '../kid/icons'
+import { SearchIcon, HomeIcon, HistoryIcon, BackIcon } from '../kid/icons'
 
 function navClasses({ isActive }) {
   // Hidden on mobile, where BottomNav already provides Home/History — the same
@@ -33,6 +33,17 @@ export default function Header() {
         <HomeIcon className="h-[18px] w-[18px]" />
         <span>Home</span>
       </NavLink>
+      {/* Icon-only, and hidden on mobile alongside the nav pills — at phone
+          widths it squeezed the search field down to ~50px. */}
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        aria-label="Go back"
+        title="Go back"
+        className="hidden shrink-0 items-center justify-center rounded-full p-2 text-text-muted transition-colors hover:bg-bg-alt sm:flex"
+      >
+        <BackIcon className="h-[18px] w-[18px]" />
+      </button>
       <NavLink to="/history" className={navClasses}>
         <HistoryIcon className="h-[18px] w-[18px]" />
         <span>History</span>
