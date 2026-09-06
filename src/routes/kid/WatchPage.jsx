@@ -167,11 +167,19 @@ export default function WatchPage() {
         // Stacked below the player on phones/narrow tablets; from lg (tablet
         // landscape) up, it becomes a vertical sidebar to the right instead —
         // matching how a real video-watching app lays out related videos.
-        // The heading stays put (sticky) while just the list beneath it
-        // scrolls independently once it's taller than the viewport.
+        // The heading stays put (from lg, sticky) while just the list beneath
+        // it scrolls independently.
+        //
+        // The list is capped at both sizes so an uncapped "up next" (the whole
+        // catalog — see the effect above) can't run the page on forever: it
+        // scrolls in its own box, and what surrounds it — the player on a
+        // phone, the sidebar's heading on a desktop — stays reachable. On a
+        // phone that cap is a share of the viewport rather than the sidebar's
+        // "whatever is left below the header", since here the list starts below
+        // the player instead of beside it.
         <div className="mt-8 lg:sticky lg:top-7 lg:mt-0 lg:w-[360px] lg:shrink-0">
           <h2 className="mb-4 font-heading text-xl font-bold text-text">Up next</h2>
-          <div className="flex flex-col gap-3 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-1">
+          <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto pr-1 lg:max-h-[calc(100vh-8rem)]">
             {upNext.map((v) => (
               <Link key={v.videoId} to={`/watch/${v.videoId}`} className="flex gap-2.5">
                 <div className="relative aspect-video w-[168px] shrink-0 overflow-hidden rounded-[10px] bg-bg-alt">
