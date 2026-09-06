@@ -5,6 +5,7 @@ import { getKidFeedVideos } from '../../services/whitelistService'
 import { logWatch } from '../../services/watchHistoryService'
 import { isDailyLimitReached } from '../../services/timeLimitService'
 import { formatDuration, formatRelativeTime } from '../../lib/format'
+import { shuffleForPageSession } from '../../lib/shuffle'
 import Avatar from '../../components/shared/Avatar'
 
 const LIMIT_CHECK_INTERVAL_MS = 15_000
@@ -26,6 +27,13 @@ export default function WatchPage() {
   // the catalog (not whitelisted, or shorter than the admin's minimum length)
   // simply isn't found, so this page refuses to play it even if the URL is
   // reached directly.
+  //
+  // "Up next" is randomised rather than newest-first, but with the order held
+  // fixed for the whole page session: tapping a video out of the list navigates
+  // here again with a new videoId, and this effect re-runs, yet
+  // shuffleForPageSession hands back the same order minus the video now
+  // playing. So the list stays put as the kid works down it, and only a fresh
+  // page load deals a new shuffle.
   useEffect(() => {
     let cancelled = false
     setStatus('loading')
@@ -38,7 +46,8 @@ export default function WatchPage() {
           return
         }
         setVideo(found)
-        setUpNext(catalog.filter((v) => v.videoId !== videoId).slice(0, 15))
+        const others = catalog.filter((v) => v.videoId !== videoId)
+        setUpNext(shuffleForPageSession(others, (v) => v.videoId).slice(0, 15))
         setStatus('ready')
       })
       .catch(() => setStatus('not-found'))

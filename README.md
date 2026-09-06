@@ -47,6 +47,27 @@ ingest) means changing the minimum takes effect immediately, with no refresh
 and no further API calls — and the admin dashboard can still show how many
 videos the rules are holding back, per channel and overall.
 
+### Feed ordering
+
+The catalog comes out of Supabase newest-upload-first, but neither kid-facing
+list is shown that way — the same few recent uploads would otherwise own the
+top of the screen until the next channel refresh. Both are randomised, with
+different lifetimes (`src/lib/shuffle.js`):
+
+| Surface | Order |
+|---|---|
+| **Home feed** | Reshuffled on every load of the page, so each visit leads with a different set of videos and older uploads get a turn. |
+| **"Up next"** | Shuffled once per page load and then held fixed. Picking a video out of the list re-runs the watch page, but the list comes back in the same order minus the video now playing — a kid working down the list isn't chasing thumbnails that move between taps. A browser reload (or a new tab) deals a new order. |
+
+"Up next" gets that stability by ranking each video independently — a hash of
+its id and a seed drawn once per page load — rather than by shuffling the list
+and caching it. The order then survives the list changing underneath it: the
+playing video dropping out, or a background feed refresh adding an upload,
+leaves every other video where the kid last saw it. The seed is deliberately
+kept in memory rather than `sessionStorage`, which would outlive a reload.
+
+Search results are left alone — a search has an order the kid asked for.
+
 ### Cleaning up orphaned videos
 
 Before migration `0003`, `channel_id` was `ON DELETE SET NULL`: removing a
@@ -197,6 +218,6 @@ src/
                         content rules, feed cache, YouTube API (Supabase-backed)
   context/             Admin auth (PIN) context
   lib/                 Config/env, format helpers, YouTube IFrame API loader,
-                        Supabase client, avatar pastel-color helper
+                        Supabase client, avatar pastel-color helper, feed shuffle
 supabase/migrations/    SQL schema (run in filename order in the Supabase SQL editor)
 ```
