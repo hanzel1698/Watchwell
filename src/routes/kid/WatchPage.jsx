@@ -34,6 +34,10 @@ export default function WatchPage() {
   // shuffleForPageSession hands back the same order minus the video now
   // playing. So the list stays put as the kid works down it, and only a fresh
   // page load deals a new shuffle.
+  //
+  // The list isn't capped: it's the whole catalog bar the current video, so
+  // scrolling "up next" far enough reaches every video the kid may watch
+  // rather than a 15-video window onto it.
   useEffect(() => {
     let cancelled = false
     setStatus('loading')
@@ -47,7 +51,7 @@ export default function WatchPage() {
         }
         setVideo(found)
         const others = catalog.filter((v) => v.videoId !== videoId)
-        setUpNext(shuffleForPageSession(others, (v) => v.videoId).slice(0, 15))
+        setUpNext(shuffleForPageSession(others, (v) => v.videoId))
         setStatus('ready')
       })
       .catch(() => setStatus('not-found'))

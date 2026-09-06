@@ -57,7 +57,7 @@ different lifetimes (`src/lib/shuffle.js`):
 | Surface | Order |
 |---|---|
 | **Home feed** | Reshuffled on every load of the page, so each visit leads with a different set of videos and older uploads get a turn. |
-| **"Up next"** | Shuffled once per page load and then held fixed. Picking a video out of the list re-runs the watch page, but the list comes back in the same order minus the video now playing — a kid working down the list isn't chasing thumbnails that move between taps. A browser reload (or a new tab) deals a new order. |
+| **"Up next"** | The whole catalog bar the video playing, uncapped — scroll far enough and every video the kid may watch is reachable from the sidebar. Shuffled once per page load and then held fixed: picking a video out of the list re-runs the watch page, but the list comes back in the same order minus the video now playing — a kid working down the list isn't chasing thumbnails that move between taps. A browser reload (or a new tab) deals a new order. |
 
 "Up next" gets that stability by ranking each video independently — a hash of
 its id and a seed drawn once per page load — rather than by shuffling the list
